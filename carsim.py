@@ -3,7 +3,7 @@ from ursina import *
 app = Ursina()
 
 class Car(Entity):
-    def __init__(self, position=(22, 90, 0), scale=(0.3, 0.3, 0.3), rotation=(0, 0, 0), topspeed=5, acceleration=0.05, braking_strength=30, friction=0.9, camera_speed=8, drift_speed=10, rotation_decay=0.5):
+    def __init__(self, position=(22, 90, 0), scale=(0.6, 0.6, 0.6), rotation=(0, 0, 0), topspeed=10, acceleration=0.08, braking_strength=10, friction=0.6, camera_speed=8, drift_speed=12, rotation_decay=0.4):
         super().__init__(
             model="sports-car.obj",
             scale=scale,
@@ -120,12 +120,12 @@ class Car(Entity):
                 else:
                     self.rotation_parent.rotation = self.rotation
 
-            elif self.y > -45.99:
-                # Apply gravity to the car when it's not on the ground
-                self.y += y_movement
-                self.velocity_y -= 50 * time.dt
-                self.rotation_parent.rotation = self.rotation
-                self.start_fall = True
+        if self.y > -45.99:
+            # Apply gravity to the car when it's not on the ground
+            self.y += y_movement
+            self.velocity_y -= 50 * time.dt
+            self.rotation_parent.rotation = self.rotation
+            self.start_fall = True
     def reset_car(self):
         self.position = (22, 90, 0)
         self.speed = Vec3(0, 0, 0)
