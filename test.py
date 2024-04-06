@@ -3,11 +3,11 @@ from ursina import *
 app = Ursina()
 
 class Car(Entity):
-    def __init__(self, position=(22, 90, 0), scale=(0.3, 0.3, 0.3), rotation=(0, 0, 0), topspeed=5, acceleration=0.05, braking_strength=30, friction=0.9, camera_speed=8, drift_speed=10, rotation_decay=0.5):
+    def __init__(self, position=(22, 90, 0), scale=(0.1, 0.1, 0.1), rotation=(0, 0, 0), topspeed=30, acceleration=0.15, braking_strength=30, friction=0.6, camera_speed=8, drift_speed=35):
         super().__init__(
-            model="sports-car.obj",
+            model="cube",
             scale=scale,
-            texture="sports-black.png",
+            color=color.red,
             collider="box",
             position=position,
             rotation=rotation,
@@ -22,7 +22,6 @@ class Car(Entity):
         self.friction = friction
         self.camera_speed = camera_speed
         self.drift_speed = drift_speed
-        self.rotation_decay = rotation_decay  # Decay factor for rotation speed
         self.is_drifting = False  # Flag to indicate if the car is drifting
 
         # Gravity
@@ -35,30 +34,15 @@ class Car(Entity):
         acceleration = self.acceleration if held_keys['w'] or held_keys['up arrow'] else 0
         deceleration = self.braking_strength if held_keys['s'] or held_keys['down arrow'] else self.friction
 
-        # Apply reverse acceleration when 's' is pressed
-        if held_keys['s'] or held_keys['down arrow']:
-            self.speed -= self.forward * self.acceleration * time.dt
-            self.topspeed = 3  # Reset topspeed when reversing
-        else:
-            self.speed -= self.speed * self.friction * time.dt
-
         # Set the speed based on acceleration and deceleration only when 'w' is pressed
         if held_keys['w'] or held_keys['up arrow']:
             self.speed += self.forward * self.acceleration * time.dt
-            self.topspeed = 6  # Reset topspeed when accelerating
+            self.topspeed = 30  # Reset topspeed when accelerating
         else:
             # Slow down gradually when 'w' is released
             self.speed -= self.speed * self.friction * time.dt
 
-        rotation_direction = 0
-
-        if held_keys['d'] or held_keys['right arrow']:
-            rotation_direction = 1
-        elif held_keys['a'] or held_keys['left arrow']:
-            rotation_direction = -1
-        else:
-            rotation_direction = 0
-
+        rotation_direction = (held_keys['d'] or held_keys['right arrow']) - (held_keys['a'] or held_keys['left arrow'])
 
         # Update rotation speed regardless of drifting
         self.rotation_speed += rotation_direction * self.drift_speed * time.dt
@@ -68,14 +52,9 @@ class Car(Entity):
             self.is_drifting = True
         else:
             self.is_drifting = False
-            
 
         if self.is_drifting:
             self.rotation_speed += rotation_direction * self.drift_speed * time.dt
-
-        # Apply rotation decay if no rotation keys are pressed
-        if rotation_direction == 0:
-            self.rotation_speed -= self.rotation_speed * self.rotation_decay * time.dt
 
         # Limit the speed to the topspeed
         self.speed = Vec3(min(max(self.speed[0], -self.topspeed), self.topspeed),
@@ -87,13 +66,20 @@ class Car(Entity):
 
         # Rotate the car based on the rotation speed
         self.rotation_y += self.rotation_speed * time.dt
-        
-        # Collision detection with box outline (the rock in the middle of map)
-        if self.intersects().hit:
-            self.position -= self.speed  # Revert position if intersects with any entity
-            self.reset_prompt.visible = True
 
-        
+        # Collision Detection
+        x_movement = self.speed[0]
+        x_direction = 1 if x_movement > 0 else -1 if x_movement < 0 else 0
+        x_ray = raycast(origin=self.position, direction=(x_direction, 0, 0), ignore=[self])
+        if x_ray.hit:
+            self.position.x = x_ray.world_point.x - x_direction * (self.scale_x / 2 + 0.01)
+
+        z_movement = self.speed[2]
+        z_direction = 1 if z_movement > 0 else -1 if z_movement < 0 else 0
+        z_ray = raycast(origin=self.position, direction=(0, 0, z_direction), ignore=[self])
+        if z_ray.hit:
+            self.position.z = z_ray.world_point.z - z_direction * (self.scale_z / 2 + 0.01)
+
         # Check if car is hitting the ground
         if self.visible:
             y_movement = self.velocity_y * 50 * time.dt
@@ -115,69 +101,53 @@ class Car(Entity):
                 # Rotates the car according to the ground's normals
                 if not self.hitting_wall:
                     look_at_direction = self.ground_normal - self.rotation_parent.position
-                    #self.rotation_parent.look_at(look_at_direction, axis="up")
-                    #self.rotation_parent.rotation += Vec3(0, self.rotation_y + 180, 0)
+                    self.rotation_parent.look_at(look_at_direction, axis="up")
+                    self.rotation_parent.rotation += Vec3(0, self.rotation_y + 180, 0)
                 else:
                     self.rotation_parent.rotation = self.rotation
 
-            elif self.y > -45.99:
+            else:
                 # Apply gravity to the car when it's not on the ground
                 self.y += y_movement
                 self.velocity_y -= 50 * time.dt
                 self.rotation_parent.rotation = self.rotation
                 self.start_fall = True
-    def reset_car(self):
-        self.position = (22, 90, 0)
-        self.speed = Vec3(0, 0, 0)
-        self.rotation_speed = 0
-        self.rotation = (0, 0, 0)
-        self.reset_prompt.visible = False
 
 # Create racetrack entity
-racetrack = Entity(model="assets/testtrack.obj", scale=(12, 12, 12), position=(0, -50, 0), rotation=(0, 270, 0), texture="assets/testtrack.png", collider="mesh")
-
-# Create box outline
-left_wall = Entity(model='cube', visible=False, scale=(0.1, 2, 40), position=(-1.2, -47, 17.5))
-bottom_wall = Entity(model='cube', visible=False, scale=(77, 2, 0.1), position=(-18.6, -47, 17))
-top_wall = Entity(model='cube', visible=False, scale=(18.93, 2, 29.8), position=(7.1, -47, 23.8))
-right_wall = Entity(model='cube', visible=False, scale=(0.1, 2, 39.7), position=(15.65, -47, 2.65))
-
-
+racetrack = Entity(model="testtrack.obj", scale=(12, 12, 12), position=(0, -50, 0), texture="white_cube", collider="mesh")
 
 # Initialize car
 car = Car()
 
 # Initialize camera position and rotation
-camera.position = (0, 50, 0)
+camera.position = (22, 100, 0)
 camera.rotation = (0, 0, 0)
 
-# Function to update camera position
+# Create dot to represent camera position
+camera_dot = Entity(model='quad', scale=0.1, color=color.green)
+
+# Function to update camera position and move the camera with WASD keys
 def update_camera():
-    # Update only the horizontal position of the camera
-    camera.position.y = 50  # Set the y position of the camera to a fixed value
-    camera.look_at(car.position)  # Make camera look at the car
+    global camera_dot
+    camera_dot.position = camera.position
+    camera_movement = Vec3(0, 0, 0)
+    if held_keys['w'] or held_keys['up arrow']:
+        camera_movement.z += 1
+    if held_keys['s'] or held_keys['down arrow']:
+        camera_movement.z -= 1
+    if held_keys['a'] or held_keys['left arrow']:
+        camera_movement.x -= 1
+    if held_keys['d'] or held_keys['right arrow']:
+        camera_movement.x += 1
+    camera.position += camera_movement.normalized() * car.camera_speed * time.dt
 
-# Create Text objects to display car and camera position
-car_position_text = Text(text='', origin=(0, 0), y=0.45)
-camera_position_text = Text(text='', origin=(0, 0), y=-0.45)
-
+# Update function
 def update():
     # Update car movement
     car.update()
 
     # Update camera position
     update_camera()
-
-    # Update car and camera position text
-    car_position_text.text = f"Car Position: {car.position}"
-    camera_position_text.text = f"Camera Position: {camera.position}"
-
-# Prompt to reset car
-car.reset_prompt = Text(text='Press R to reset car', position=(-0.2, 0.2), color=color.red, scale=2, background=False, visible=False)
-
-def input(key):
-    if key == 'r':
-        car.reset_car()
 
 # Run the app
 app.run()
