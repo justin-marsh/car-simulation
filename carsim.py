@@ -28,6 +28,7 @@ class Car(Entity):
             rotation=rotation,
         )
 
+        
         # Car attributes and controls
         self.speed = Vec3(0, 0, 0)
         self.rotation_speed = 0
@@ -53,6 +54,10 @@ class Car(Entity):
 
         # Rotation parent for smoother rotation
         self.rotation_parent = Entity(parent=self, y=1.4)
+
+        # Initialize timer for reset prompt visibility
+        self.reset_timer = 0
+        self.reset_timer_duration = 3  # Duration in seconds
 
     def update(self):
         # Check if the car is in water
@@ -136,18 +141,23 @@ class Car(Entity):
 
         # Set the speed based on acceleration and deceleration only when 'w' is pressed
         if held_keys['w'] or held_keys['up arrow']:
-            self.speed += self.forward * self.acceleration * time.dt
+            if self.in_water:
+                # Lower acceleration in water
+                self.speed += self.forward * (self.acceleration * 0.5) * time.dt
+            elif self.is_in_sand():
+                # Lower acceleration in sand
+                self.speed += self.forward * (self.acceleration * 0.4) * time.dt
+            else:
+                self.speed += self.forward * self.acceleration * time.dt
             self.topspeed = 6  # Reset topspeed when accelerating
-        else:
-            # Slow down gradually when 'w' is released
-            self.speed -= self.speed * self.friction * time.dt
+
 
         rotation_direction = 0
 
         if held_keys['d'] or held_keys['right arrow']:
             rotation_direction = 1
         elif held_keys['a'] or held_keys['left arrow']:
-            rotation_direction = -1
+            rotation_direction = -1 #tilts car orientation
         else:
             rotation_direction = 0
 
@@ -184,7 +194,17 @@ class Car(Entity):
         if self.intersects().hit:
             self.position -= self.speed  # Revert position if intersects with any entity
             self.reset_prompt.visible = True
+            # Start the timer
+            self.reset_timer = self.reset_timer_duration
 
+         # Update the timer
+        if self.reset_timer > 0:
+            self.reset_timer -= time.dt
+            # Check if the timer has elapsed
+            if self.reset_timer <= 0:
+                self.reset_prompt.visible = False  # Hide the reset prompt
+       
+        
         # Check if car is hitting the ground
         if self.visible:
             y_movement = self.velocity_y * 50 * time.dt
@@ -209,34 +229,42 @@ class Car(Entity):
                 else:
                     self.rotation_parent.rotation = self.rotation
 
-        if self.y > -45.99:
+        if self.y > -45.99: #threshold for ground 
             # Apply gravity to the car when it's not on the ground
             self.y += y_movement
             self.velocity_y -= 50 * time.dt
             self.rotation_parent.rotation = self.rotation
             self.start_fall = True
         
+         
         # Adjust car attributes while in water
         if self.in_water:
-            self.topspeed = 1
-            self.acceleration = 0.01
-            self.friction = 0.8
-            self.drift_speed = 0.1
+            self.topspeed = 0.5
+            self.acceleration = 0.005  # Decreased acceleration
+            self.friction = 0.7  # Adjusted friction
+            self.drift_speed = 0.005  # Decreased drift speed
             self.rotation_decay = 0.9
 
-            # Limit the speed to the topspeed with adjusted values
-            self.speed = Vec3(
-                min(max(self.speed[0], -self.topspeed), self.topspeed),
-                self.speed[1],
-                min(max(self.speed[2], -self.topspeed), self.topspeed)
-            )
+            # Continuously update speed until it reaches the desired speed
+            while self.speed.length() > self.topspeed:
+                # Apply friction to slow down the car
+                self.speed -= self.speed * self.friction * time.dt
+
+                # Limit the speed to the topspeed with adjusted values
+                self.speed = Vec3(
+                    min(max(self.speed[0], -self.topspeed), self.topspeed),
+                    self.speed[1],
+                    min(max(self.speed[2], -self.topspeed), self.topspeed)
+                )
+
+
         
         # Adjust car attributes while in water
         if self.is_in_mud:
             self.topspeed = 6
             self.acceleration = 0.03
             self.friction = 0.3
-            self.drift_speed = 11
+            self.drift_speed = 8
             self.rotation_decay = 0.1
         
         # Adjust car attributes while in sand
