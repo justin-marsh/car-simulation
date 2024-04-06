@@ -2,6 +2,21 @@ from ursina import *
 
 app = Ursina()
 
+class StartMenu(Entity):
+    def __init__(self):
+        super().__init__(
+            model='quad',
+            scale=(3, 1, 1),
+            color=color.white,
+            position=(0, 0, 0),
+            collider='box'
+        )
+        self.start_button = Button(text='Start', scale=0.1, color=color.black, parent=self, position=(0, 0))
+
+    def start_game(self):
+        self.disable()
+        car_simulation.enabled = True  # Enable the car simulation when the game starts
+
 class Car(Entity):
     def __init__(self, position=(22, 90, 0), scale=(0.6, 0.6, 0.6), rotation=(0, 0, 0), topspeed=12, acceleration=0.08, braking_strength=10, friction=0.6, camera_speed=8, drift_speed=19, rotation_decay=0.4):
         super().__init__(
@@ -204,9 +219,9 @@ class Car(Entity):
         # Adjust car attributes while in water
         if self.in_water:
             self.topspeed = 1
-            self.acceleration = 0.03
+            self.acceleration = 0.01
             self.friction = 0.8
-            self.drift_speed = 1
+            self.drift_speed = 0.1
             self.rotation_decay = 0.9
 
             # Limit the speed to the topspeed with adjusted values
@@ -219,22 +234,15 @@ class Car(Entity):
         # Adjust car attributes while in water
         if self.is_in_mud:
             self.topspeed = 6
-            self.acceleration = 0.04
+            self.acceleration = 0.03
             self.friction = 0.3
             self.drift_speed = 11
             self.rotation_decay = 0.1
         
-        # Adjust car attributes while in water
-        if self.is_in_mud:
-            self.topspeed = 6
-            self.acceleration = 0.04
-            self.friction = 0.3
-            self.drift_speed = 11
-            self.rotation_decay = 0.1
         # Adjust car attributes while in sand
         if self.is_in_sand():
             self.topspeed = 8  # Adjust top speed on sand
-            self.acceleration = 0.06  # Adjust acceleration on sand
+            self.acceleration = 0.05  # Adjust acceleration on sand
             self.friction = 0.5  # Adjust friction on sand
             self.drift_speed = 15  # Adjust drift speed on sand
             self.rotation_decay = 0.3  # Adjust rotation decay on sand
@@ -256,8 +264,18 @@ class Car(Entity):
         self.drift_speed = self.default_attributes['drift_speed']
         self.rotation_decay = self.default_attributes['rotation_decay']
 
+
+# Create start menu
+start_menu = StartMenu()
+start_menu.parent = scene  # Add the start menu to the scene graph
+
+# Create car simulation scene
+car_simulation = Entity(enabled=False)  # Initially disabled until the game starts
+car_simulation.parent = scene  # Add the car simulation to the scene graph
+
 # Create racetrack entity
 racetrack = Entity(model="assets/testtrack.obj", scale=(12, 12, 12), position=(0, -50, 0), rotation=(0, 270, 0), texture="assets/testtrack.png", collider="mesh")
+racetrack.parent = scene  # Add the racetrack to the scene graph
 
 # Create box outline
 left_wall = Entity(model='cube', visible=False, scale=(0.1, 2, 40), position=(-1.2, -47, 17.5))
@@ -299,6 +317,8 @@ car.reset_prompt = Text(text='Press R to reset car', position=(-0.2, 0.2), color
 def input(key):
     if key == 'r':
         car.reset_car()
+    elif key == 'left mouse down':
+        start_menu.start_game()
 
 # Run the app
 app.run()
