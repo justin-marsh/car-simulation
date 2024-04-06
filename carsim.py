@@ -3,7 +3,7 @@ from ursina import *
 app = Ursina()
 
 class Car(Entity):
-    def __init__(self, position=(22, 90, 0), scale=(0.6, 0.6, 0.6), rotation=(0, 0, 0), topspeed=10, acceleration=0.08, braking_strength=10, friction=0.6, camera_speed=8, drift_speed=12, rotation_decay=0.4):
+    def __init__(self, position=(22, 90, 0), scale=(0.6, 0.6, 0.6), rotation=(0, 0, 0), topspeed=12, acceleration=0.08, braking_strength=10, friction=0.6, camera_speed=8, drift_speed=19, rotation_decay=0.4):
         super().__init__(
             model="sports-car.obj",
             scale=scale,
@@ -24,6 +24,14 @@ class Car(Entity):
         self.drift_speed = drift_speed
         self.rotation_decay = rotation_decay  # Decay factor for rotation speed
         self.is_drifting = False  # Flag to indicate if the car is drifting
+        self.default_attributes = {
+            'topspeed': topspeed,
+            'acceleration': acceleration,
+            'friction': friction,
+            'drift_speed': drift_speed,
+            'rotation_decay': rotation_decay
+        }
+        self.in_water = False  # Flag to indicate if the car is in water
 
         # Gravity
         self.velocity_y = 0
@@ -32,6 +40,75 @@ class Car(Entity):
         self.rotation_parent = Entity(parent=self, y=1.4)
 
     def update(self):
+        # Check if the car is in water
+        self.in_water = self.is_in_water()
+
+        # Update car movement
+        self.update_movement()
+
+        # Reset car attributes if not in water
+        if not self.in_water:
+            self.reset_attributes()
+
+    def is_in_water(self):
+        water_pad_coordinates = [
+        (45, -46, 37.21),
+        (21, -46, 60),
+        (36, -46, 85.6),
+        (67, -46, 62)
+        ]
+
+        # Extract x and z coordinates of the water pad corners
+        x_coords = [coord[0] for coord in water_pad_coordinates]
+        z_coords = [coord[2] for coord in water_pad_coordinates]
+
+        # Check if the car's position is inside the bounding box formed by water pad coordinates
+        x_min, x_max = min(x_coords), max(x_coords)
+        z_min, z_max = min(z_coords), max(z_coords)
+        
+        x_car, _, z_car = self.position
+        return x_car >= x_min and x_car <= x_max and z_car >= z_min and z_car <= z_max
+
+    def is_in_mud(self):
+        mud_coordinates = [
+        (-62.6, -46, 38),
+        (-40.41, -46, -2.1),
+        (-56.6, -46, -33.8),
+        (-77, -46, -13)
+        ]
+
+        # Extract x and z coordinates of the mud area corners
+        x_coords = [coord[0] for coord in mud_coordinates]
+        z_coords = [coord[2] for coord in mud_coordinates]
+
+        # Check if the car's position is inside the bounding box formed by mud area coordinates
+        x_min, x_max = min(x_coords), max(x_coords)
+        z_min, z_max = min(z_coords), max(z_coords)
+        
+        x_car, _, z_car = self.position
+        return x_car >= x_min and x_car <= x_max and z_car >= z_min and z_car <= z_max
+
+    def is_in_sand(self):
+        sand_coordinates = [
+            (38, -46, -68),
+            (47, -46, -49.28),
+            (70.6, -46, -52),
+            (53.15, -46, -89)
+        ]
+
+        # Extract x and z coordinates of the sand area corners
+        x_coords = [coord[0] for coord in sand_coordinates]
+        z_coords = [coord[2] for coord in sand_coordinates]
+
+        # Check if the car's position is inside the bounding box formed by sand area coordinates
+        x_min, x_max = min(x_coords), max(x_coords)
+        z_min, z_max = min(z_coords), max(z_coords)
+        
+        x_car, _, z_car = self.position
+        return x_car >= x_min and x_car <= x_max and z_car >= z_min and z_car <= z_max
+
+
+    def update_movement(self):
         acceleration = self.acceleration if held_keys['w'] or held_keys['up arrow'] else 0
         deceleration = self.braking_strength if held_keys['s'] or held_keys['down arrow'] else self.friction
 
@@ -59,7 +136,6 @@ class Car(Entity):
         else:
             rotation_direction = 0
 
-
         # Update rotation speed regardless of drifting
         self.rotation_speed += rotation_direction * self.drift_speed * time.dt
 
@@ -68,7 +144,6 @@ class Car(Entity):
             self.is_drifting = True
         else:
             self.is_drifting = False
-            
 
         if self.is_drifting:
             self.rotation_speed += rotation_direction * self.drift_speed * time.dt
@@ -78,22 +153,23 @@ class Car(Entity):
             self.rotation_speed -= self.rotation_speed * self.rotation_decay * time.dt
 
         # Limit the speed to the topspeed
-        self.speed = Vec3(min(max(self.speed[0], -self.topspeed), self.topspeed),
-                          self.speed[1],
-                          min(max(self.speed[2], -self.topspeed), self.topspeed))
+        self.speed = Vec3(
+            min(max(self.speed[0], -self.topspeed), self.topspeed),
+            self.speed[1],
+            min(max(self.speed[2], -self.topspeed), self.topspeed)
+        )
 
         # Move the car based on the calculated speed
         self.position += self.speed
 
         # Rotate the car based on the rotation speed
         self.rotation_y += self.rotation_speed * time.dt
-        
-        # Collision detection with box outline (the rock in the middle of map)
+
+        # Collision detection with box outline
         if self.intersects().hit:
             self.position -= self.speed  # Revert position if intersects with any entity
             self.reset_prompt.visible = True
 
-        
         # Check if car is hitting the ground
         if self.visible:
             y_movement = self.velocity_y * 50 * time.dt
@@ -115,8 +191,6 @@ class Car(Entity):
                 # Rotates the car according to the ground's normals
                 if not self.hitting_wall:
                     look_at_direction = self.ground_normal - self.rotation_parent.position
-                    #self.rotation_parent.look_at(look_at_direction, axis="up")
-                    #self.rotation_parent.rotation += Vec3(0, self.rotation_y + 180, 0)
                 else:
                     self.rotation_parent.rotation = self.rotation
 
@@ -126,12 +200,61 @@ class Car(Entity):
             self.velocity_y -= 50 * time.dt
             self.rotation_parent.rotation = self.rotation
             self.start_fall = True
+        
+        # Adjust car attributes while in water
+        if self.in_water:
+            self.topspeed = 1
+            self.acceleration = 0.03
+            self.friction = 0.8
+            self.drift_speed = 1
+            self.rotation_decay = 0.9
+
+            # Limit the speed to the topspeed with adjusted values
+            self.speed = Vec3(
+                min(max(self.speed[0], -self.topspeed), self.topspeed),
+                self.speed[1],
+                min(max(self.speed[2], -self.topspeed), self.topspeed)
+            )
+        
+        # Adjust car attributes while in water
+        if self.is_in_mud:
+            self.topspeed = 6
+            self.acceleration = 0.04
+            self.friction = 0.3
+            self.drift_speed = 11
+            self.rotation_decay = 0.1
+        
+        # Adjust car attributes while in water
+        if self.is_in_mud:
+            self.topspeed = 6
+            self.acceleration = 0.04
+            self.friction = 0.3
+            self.drift_speed = 11
+            self.rotation_decay = 0.1
+        # Adjust car attributes while in sand
+        if self.is_in_sand():
+            self.topspeed = 8  # Adjust top speed on sand
+            self.acceleration = 0.06  # Adjust acceleration on sand
+            self.friction = 0.5  # Adjust friction on sand
+            self.drift_speed = 15  # Adjust drift speed on sand
+            self.rotation_decay = 0.3  # Adjust rotation decay on sand
+
+        
+
     def reset_car(self):
         self.position = (22, 90, 0)
         self.speed = Vec3(0, 0, 0)
         self.rotation_speed = 0
         self.rotation = (0, 0, 0)
         self.reset_prompt.visible = False
+
+    def reset_attributes(self):
+        # Reset car attributes to default values
+        self.topspeed = self.default_attributes['topspeed']
+        self.acceleration = self.default_attributes['acceleration']
+        self.friction = self.default_attributes['friction']
+        self.drift_speed = self.default_attributes['drift_speed']
+        self.rotation_decay = self.default_attributes['rotation_decay']
 
 # Create racetrack entity
 racetrack = Entity(model="assets/testtrack.obj", scale=(12, 12, 12), position=(0, -50, 0), rotation=(0, 270, 0), texture="assets/testtrack.png", collider="mesh")
@@ -141,8 +264,6 @@ left_wall = Entity(model='cube', visible=False, scale=(0.1, 2, 40), position=(-1
 bottom_wall = Entity(model='cube', visible=False, scale=(77, 2, 0.1), position=(-18.6, -47, 17))
 top_wall = Entity(model='cube', visible=False, scale=(18.93, 2, 29.8), position=(7.1, -47, 23.8))
 right_wall = Entity(model='cube', visible=False, scale=(0.1, 2, 39.7), position=(15.65, -47, 2.65))
-
-
 
 # Initialize car
 car = Car()
