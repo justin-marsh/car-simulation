@@ -3,9 +3,10 @@ A 3d car simulation using Ursina
 
 In order to run this simulation, Ursina must be installed
 
-'''console
+```console
 pip install ursina 
-'''
+```
+
 
 After installing Ursina, simply run the carsim.py to start the simulation!
 
