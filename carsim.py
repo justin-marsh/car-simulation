@@ -340,7 +340,7 @@ def update():
     camera_position_text.text = f"Camera Position: {camera.position}"
 
 # Prompt to reset car
-car.reset_prompt = Text(text='Press R to reset car', position=(-0.2, 0.2), color=color.red, scale=2, background=False, visible=False)
+car.reset_prompt = Text(text='Press R to reset car', position=(-0.2, 0.2), color=color.white, scale=2, background=False, visible=False)
 
 def input(key):
     if key == 'r':
