@@ -5,7 +5,9 @@
 | Justin Marsh  | justin-marsh  | 100792009  |
 | Edison Lei    | eleiotu       | 100750499  |
 
+
 A 3d car drfiting simulation using Ursina to load 3d models 
+
 
 In order to run this simulation, Ursina must be installed
 
