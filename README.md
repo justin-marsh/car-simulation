@@ -5,6 +5,8 @@
 | Justin Marsh  | justin-marsh  | 100792009  |
 | Edison Lei    | eleiotu       | 100750499  |
 
+Link to video [demo](https://drive.google.com/file/d/1Gx26Ex23TwR8bcAWOBseHkV0y5AtPN3B/view?usp=sharing)
+
 
 A 3d car drfiting simulation using Ursina to load 3d models 
 
